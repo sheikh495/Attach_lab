@@ -24,7 +24,7 @@ Dump of assembler code for function getbuf:
 
 If you look at `sub    $0x38,%rsp`, you can see that 56 (0x38) bytes of buffer is allocated for getbuf.
 
-Now you know the buffer size and you need to input 24 bytes of padding followed by the return address of the touch1 address.
+Now you know the buffer size and you need to input 56 bytes of padding followed by the return address of the touch1 address.
 
 To find the address the touch1, you need to get the dissasembled code for ctarget executable.
 
